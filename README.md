@@ -1,2 +1,2 @@
 # shonkhipto
-URL Shortener written in python, fastapi.
+URL Shortener written in python-fastapi and nextjs.
