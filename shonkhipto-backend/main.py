@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from starlette import status
 from sqlalchemy.orm import Session
 import models
@@ -14,11 +15,15 @@ class URLBase(BaseModel):
 
 @app.post("/shorten")
 async def shorten_url(url: URLBase, db: Session=Depends(get_db)):
-    db_url = models.URL(**url.model_dump())
-    db.add(db_url)
-    db.commit()
-    db.refresh(db_url)
-    return db_url
+    try:
+        db_url = models.URL(**url.model_dump())
+        db.add(db_url)
+        db.commit()
+        db.refresh(db_url)
+        return db_url
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Short code already exists")
 
 @app.get("/shorten/{short_code}")
 async def get_shortened_url(short_code: str, db: Session=Depends(get_db)):
