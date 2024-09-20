@@ -24,3 +24,4 @@ typing_extensions==4.12.2
 uvicorn==0.30.6
 
 alembic~=1.13.2
+passlib~=1.7.4
