@@ -26,6 +26,9 @@ class URLBase(BaseModel):
     url: str = Field(min_length=1, max_length=512)
     short_code: str = Field(min_length=1, max_length=7)
 
+class IdTokenBase(BaseModel):
+    id_token: str = Field(min_length=1)
+
 
 class UserBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -118,6 +121,41 @@ async def google_oauth_redirect(code: str = Query(...)):
     print(user_name, user_email)
 
     return RedirectResponse(url="http://localhost:3000/login/google/redirect{token}")
+
+@app.post("/auth/google")
+async def verify_google_id_token(id_token: IdTokenBase, db: Session = Depends(get_db)):
+    try:
+        decoded_id_token = jwt.decode(id_token.id_token, options={"verify_signature": False})
+        user_email = decoded_id_token.get('email')
+        user_name = decoded_id_token.get('name')
+        user_id = decoded_id_token.get('sub')
+
+        if not user_email:
+            raise HTTPException(status_code=400, detail="Email not found in ID token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f'Invalid ID token: {str(e)}')
+
+        # Check if the user already exists
+    db_user = await get_user_by_email(db, user_email)
+
+    if not db_user:
+        # Create a new user
+        db_user = models.User(
+            name=user_name,
+            email=user_email,
+            password_hash=user_id  # Use user_id or a generated password hash for security
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+
+    # Return user information (and possibly a token if you have a token generation function)
+    return {
+        "id": db_user.id,
+        "name": db_user.name,
+        "email": db_user.email,
+        "profile_image": decoded_id_token.get('picture'),  # Optional, if you want to store the profile image
+    }
 
 
 @app.post("/shorten")
